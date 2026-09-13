@@ -141,6 +141,19 @@ main {
 .parent-card[data-kind="interaction"] { border-left: 4px solid var(--interaction); }
 .parent-card[data-kind="system"] { border-left: 4px solid var(--system); }
 
+.parent-card.is-static {
+  cursor: default;
+  margin-bottom: 0.85rem;
+}
+
+.parent-head {
+  margin-bottom: 0.25rem;
+}
+
+.home-stack.is-searching .parent-grid {
+  display: none;
+}
+
 .list-title {
   margin: 0 0 0.45rem;
   font-size: 0.9rem;

@@ -24,19 +24,25 @@
     terms: [],
     byId: new Map(),
     filterParent: null,
-    query: ""
+    query: "",
+    screen: "home" // home | parent | detail
   };
 
   const els = {
     q: document.getElementById("q"),
     home: document.getElementById("home-view"),
+    parentView: document.getElementById("parent-view"),
+    parentHead: document.getElementById("parent-head"),
+    parentList: document.getElementById("parent-term-list"),
+    parentListTitle: document.getElementById("parent-list-title"),
+    parentBack: document.getElementById("parent-back-btn"),
     detailView: document.getElementById("detail-view"),
     detail: document.getElementById("detail"),
     list: document.getElementById("term-list"),
     listBlock: document.getElementById("list-block"),
     parents: document.getElementById("parent-grid"),
     back: document.getElementById("back-btn"),
-    listTitle: document.querySelector(".list-title")
+    listTitle: document.querySelector("#list-block .list-title")
   };
 
   function normalize(s) {
@@ -59,34 +65,63 @@
     );
   }
 
-  function filteredTerms() {
-    let list = state.terms.slice();
-    if (state.filterParent) {
-      list = list.filter(
-        (t) => t.id === state.filterParent || t.parentId === state.filterParent
-      );
-    }
-    const q = normalize(state.query);
-    if (q) {
-      list = list.filter((t) => haystack(t).includes(q));
-    }
-    return list.sort((a, b) => a.nameJa.localeCompare(b.nameJa, "ja"));
+  function termsForParent(parentId) {
+    return state.terms
+      .filter((t) => t.id === parentId || t.parentId === parentId)
+      .sort((a, b) => a.nameJa.localeCompare(b.nameJa, "ja"));
+  }
+
+  function searchTerms(qRaw) {
+    const q = normalize(qRaw);
+    if (!q) return [];
+    return state.terms
+      .filter((t) => haystack(t).includes(q))
+      .sort((a, b) => a.nameJa.localeCompare(b.nameJa, "ja"));
+  }
+
+  function allTermsSorted() {
+    return state.terms
+      .slice()
+      .sort((a, b) => a.nameJa.localeCompare(b.nameJa, "ja"));
+  }
+
+  function setScreens(screen) {
+    state.screen = screen;
+    els.home.hidden = screen !== "home";
+    els.parentView.hidden = screen !== "parent";
+    els.detailView.hidden = screen !== "detail";
   }
 
   function showHome() {
-    els.home.hidden = false;
-    els.detailView.hidden = true;
-    history.replaceState(null, "", "#");
+    state.filterParent = null;
+    setScreens("home");
+    history.replaceState(null, "", location.pathname + location.search);
+    renderHome();
+    window.scrollTo(0, 0);
+  }
+
+  function showParent(parentId) {
+    state.filterParent = parentId;
+    state.query = "";
+    els.q.value = "";
+    setScreens("parent");
+    history.replaceState(null, "", "#cat/" + encodeURIComponent(parentId));
+    renderParent();
+    window.scrollTo(0, 0);
   }
 
   function showDetail(id) {
     const term = state.byId.get(id);
     if (!term) return;
-    els.home.hidden = true;
-    els.detailView.hidden = false;
+    setScreens("detail");
     els.detail.innerHTML = renderDetail(term);
     history.replaceState(null, "", "#" + encodeURIComponent(id));
     window.scrollTo(0, 0);
+  }
+
+  function backFromDetail() {
+    if (state.filterParent) showParent(state.filterParent);
+    else showHome();
   }
 
   function parentLabel(id) {
@@ -154,44 +189,11 @@
       .replace(/"/g, "&quot;");
   }
 
-  function renderParents() {
-    els.parents.innerHTML = PARENTS.map((p) => {
-      const active = state.filterParent === p.id ? " is-active" : "";
-      return `<button type="button" class="parent-card${active}" data-kind="${p.kind}" data-filter="${p.id}">
-        <strong>${escapeHtml(p.title)}</strong>
-        <span>${escapeHtml(p.note)}</span>
-      </button>`;
-    }).join("");
-  }
-
-  function renderList() {
-    const list = filteredTerms();
-    const searching = Boolean(state.query.trim());
-    els.home.classList.toggle("is-searching", searching);
-
-    // 検索中は結果をヒント直下（親カードより上）へ。通常は親カードの下。
-    const hint = els.home.querySelector(".hint");
-    if (searching) {
-      els.home.insertBefore(els.listBlock, els.parents);
-    } else if (hint && hint.nextElementSibling !== els.parents) {
-      els.home.insertBefore(els.parents, els.listBlock);
-    }
-
-    if (state.filterParent && !searching) {
-      const p = PARENTS.find((x) => x.id === state.filterParent);
-      els.listTitle.textContent = p ? p.title + " の用語" : "一覧";
-    } else if (searching) {
-      els.listTitle.textContent = "検索結果（" + list.length + "）";
-    } else {
-      els.listTitle.textContent = "すべて";
-    }
-
+  function termButtonsHtml(list) {
     if (!list.length) {
-      els.list.innerHTML = `<li class="empty">該当なし。別名やカタカナでも試せます。</li>`;
-      return;
+      return `<li class="empty">該当なし。別名やカタカナでも試せます。</li>`;
     }
-
-    els.list.innerHTML = list
+    return list
       .map(
         (t) => `<li>
         <button type="button" data-open="${t.id}">
@@ -203,30 +205,86 @@
       .join("");
   }
 
-  function render() {
+  function renderParents() {
+    els.parents.innerHTML = PARENTS.map(
+      (p) => `<button type="button" class="parent-card" data-kind="${p.kind}" data-filter="${p.id}">
+        <strong>${escapeHtml(p.title)}</strong>
+        <span>${escapeHtml(p.note)}</span>
+      </button>`
+    ).join("");
+  }
+
+  function renderHome() {
+    const searching = Boolean(state.query.trim());
+    els.home.classList.toggle("is-searching", searching);
+    els.parents.hidden = searching;
+
+    const hint = els.home.querySelector(".hint");
+    if (searching) {
+      els.home.insertBefore(els.listBlock, els.parents);
+    } else if (hint && hint.nextElementSibling !== els.parents) {
+      els.home.insertBefore(els.parents, els.listBlock);
+    }
+
+    const list = searching ? searchTerms(state.query) : allTermsSorted();
+    els.listTitle.textContent = searching
+      ? "検索結果（" + list.length + "）"
+      : "すべて";
+    els.list.innerHTML = termButtonsHtml(list);
     renderParents();
-    renderList();
+  }
+
+  function renderParent() {
+    const p = PARENTS.find((x) => x.id === state.filterParent);
+    if (!p) {
+      showHome();
+      return;
+    }
+    els.parentHead.innerHTML = `
+      <div class="parent-card is-static" data-kind="${p.kind}">
+        <strong>${escapeHtml(p.title)}</strong>
+        <span>${escapeHtml(p.note)}</span>
+      </div>`;
+    const list = termsForParent(p.id);
+    els.parentListTitle.textContent = "この分類の用語（" + list.length + "）";
+    els.parentList.innerHTML = termButtonsHtml(list);
+  }
+
+  function applyHash() {
+    const raw = decodeURIComponent((location.hash || "#").slice(1));
+    if (raw.startsWith("cat/")) {
+      const id = raw.slice(4);
+      if (PARENTS.some((p) => p.id === id)) {
+        showParent(id);
+        return;
+      }
+    }
+    if (raw && state.byId.has(raw)) {
+      // 用語詳細。親フィルタは維持しない（直リンク）
+      state.filterParent = null;
+      showDetail(raw);
+      return;
+    }
+    showHome();
   }
 
   function bind() {
     els.q.addEventListener("input", () => {
       state.query = els.q.value;
-      if (!els.home.hidden) renderList();
-      else {
-        showHome();
-        render();
+      if (state.query.trim()) {
+        state.filterParent = null;
+        setScreens("home");
+        history.replaceState(null, "", location.pathname + location.search);
+        renderHome();
+      } else if (state.screen === "home") {
+        renderHome();
       }
     });
 
     els.parents.addEventListener("click", (ev) => {
       const btn = ev.target.closest("[data-filter]");
       if (!btn) return;
-      const id = btn.getAttribute("data-filter");
-      state.filterParent = state.filterParent === id ? null : id;
-      state.query = "";
-      els.q.value = "";
-      showHome();
-      render();
+      showParent(btn.getAttribute("data-filter"));
     });
 
     document.body.addEventListener("click", (ev) => {
@@ -235,34 +293,23 @@
       showDetail(open.getAttribute("data-open"));
     });
 
-    els.back.addEventListener("click", () => {
-      showHome();
-      render();
-    });
+    els.parentBack.addEventListener("click", () => showHome());
+    els.back.addEventListener("click", () => backFromDetail());
 
-    window.addEventListener("hashchange", () => {
-      const id = decodeURIComponent((location.hash || "#").slice(1));
-      if (id && state.byId.has(id)) showDetail(id);
-      else {
-        showHome();
-        render();
-      }
-    });
+    window.addEventListener("hashchange", () => applyHash());
   }
 
   async function boot() {
-    const res = await fetch("terms.json?v=0.1");
+    const res = await fetch("terms.json?v=0.1.2");
     const data = await res.json();
     state.terms = data.terms || [];
     state.byId = new Map(state.terms.map((t) => [t.id, t]));
     bind();
-    const id = decodeURIComponent((location.hash || "#").slice(1));
-    render();
-    if (id && state.byId.has(id)) showDetail(id);
+    applyHash();
   }
 
   boot().catch((err) => {
-    els.list.innerHTML = `<li class="empty">読み込みに失敗しました。ローカルサーバー経由で開いてください。</li>`;
+    els.list.innerHTML = `<li class="empty">読み込みに失敗しました。ページを更新してください。</li>`;
     console.error(err);
   });
 })();
