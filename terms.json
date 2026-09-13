@@ -121,7 +121,7 @@
       "name": "Toggle",
       "nameJa": "トグル",
       "reading": "トグル",
-      "oneLiner": "オン／オフや択一など、状態を切り替える操作。",
+      "oneLiner": "状態を切り替える操作。見た目（カード／タブ等）ではなく役割で判定する。",
       "parentId": "interaction",
       "scope": "both",
       "aliases": ["トグル", "切り替え"],
