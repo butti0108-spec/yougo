@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f2ee">
+  <title>用語チートシート｜メーカー会話用</title>
+  <link rel="stylesheet" href="styles.css?v=0.1.1">
+</head>
+<body>
+  <header class="top">
+    <p class="purpose">覚えるためではない。会話を円滑にするため。</p>
+    <h1>用語チートシート</h1>
+    <label class="search-wrap" for="q">
+      <span class="visually-hidden">検索</span>
+      <input id="q" type="search" placeholder="例：Toggle / トグル / 本線" autocomplete="off" enterkeyhint="search">
+    </label>
+  </header>
+
+  <main id="app">
+    <section id="home-view" class="view home-stack">
+      <p class="hint">ホームページメーカー開発の会話用。正本はUI分類辞書。</p>
+      <div class="parent-grid" id="parent-grid"></div>
+      <div class="list-block" id="list-block">
+        <h2 class="list-title">すべて</h2>
+        <ul class="term-list" id="term-list"></ul>
+      </div>
+    </section>
+
+    <section id="detail-view" class="view" hidden>
+      <button type="button" class="back-btn" id="back-btn">← 一覧へ</button>
+      <article id="detail" class="detail"></article>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>優先: メーカー用語 → 会話頻出 → 一般Web。辞書→本ツールの一方向のみ。</p>
+  </footer>
+
+  <script src="app.js?v=0.1.1" defer></script>
+</body>
+</html>
