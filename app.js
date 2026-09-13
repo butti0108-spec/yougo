@@ -299,13 +299,29 @@
     window.addEventListener("hashchange", () => applyHash());
   }
 
+  function registerPwa() {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("./sw.js").catch((err) => {
+      console.warn("SW register failed", err);
+    });
+    const hint = document.getElementById("install-hint");
+    if (
+      hint &&
+      (window.matchMedia("(display-mode: standalone)").matches ||
+        window.navigator.standalone === true)
+    ) {
+      hint.hidden = true;
+    }
+  }
+
   async function boot() {
-    const res = await fetch("terms.json?v=0.1.2");
+    const res = await fetch("terms.json?v=0.2");
     const data = await res.json();
     state.terms = data.terms || [];
     state.byId = new Map(state.terms.map((t) => [t.id, t]));
     bind();
     applyHash();
+    registerPwa();
   }
 
   boot().catch((err) => {

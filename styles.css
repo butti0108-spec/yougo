@@ -289,3 +289,9 @@ main {
 }
 
 .foot p { margin: 0; }
+
+.install-hint {
+  margin-top: 0.55rem !important;
+  color: var(--accent);
+  font-weight: 700;
+}
