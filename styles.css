@@ -172,7 +172,19 @@ main {
   gap: 0.4rem;
 }
 
-.term-list button {
+.term-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.35rem;
+  align-items: stretch;
+}
+
+.term-row.is-known .term-open {
+  opacity: 0.72;
+}
+
+.term-open,
+.term-list > li > button.term-open {
   width: 100%;
   text-align: left;
   padding: 0.75rem 0.85rem;
@@ -194,9 +206,54 @@ main {
   color: var(--muted);
 }
 
-.term-list button:hover,
-.parent-card:hover {
+.know-btn {
+  min-width: 2.75rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--card);
+  color: var(--muted);
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.know-btn.is-on {
+  color: #9a6b00;
+  background: #fff8e8;
+  border-color: rgba(154, 107, 0, 0.35);
+}
+
+.detail-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.15rem;
+}
+
+.detail-top h2 {
+  margin: 0;
+  flex: 1 1 12rem;
+}
+
+.detail-top .know-btn {
+  min-width: auto;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.7rem;
+}
+
+.term-open:hover,
+.parent-card:hover,
+.know-btn:hover {
   background: #fafaf8;
+}
+
+.know-btn.is-on:hover {
+  background: #fff3d6;
 }
 
 .back-btn {

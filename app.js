@@ -20,12 +20,17 @@
     }
   ];
 
+  const STORAGE_KNOWN = "yougo-known-v1";
+  const STORAGE_SEARCH = "yougo-search-v1";
+
   const state = {
     terms: [],
     byId: new Map(),
     filterParent: null,
     query: "",
-    screen: "home" // home | parent | detail
+    screen: "home",
+    known: {},
+    searchCount: {}
   };
 
   const els = {
@@ -44,6 +49,44 @@
     back: document.getElementById("back-btn"),
     listTitle: document.querySelector("#list-block .list-title")
   };
+
+  function loadStore(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : fallback;
+    } catch (e) {
+      return fallback;
+    }
+  }
+
+  function saveStore(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      /* ignore quota */
+    }
+  }
+
+  function isKnown(id) {
+    return Boolean(state.known[id]);
+  }
+
+  function searchHits(id) {
+    return Number(state.searchCount[id] || 0);
+  }
+
+  function toggleKnown(id) {
+    if (state.known[id]) delete state.known[id];
+    else state.known[id] = true;
+    saveStore(STORAGE_KNOWN, state.known);
+  }
+
+  function bumpSearch(id) {
+    state.searchCount[id] = searchHits(id) + 1;
+    saveStore(STORAGE_SEARCH, state.searchCount);
+  }
 
   function normalize(s) {
     return String(s || "")
@@ -65,24 +108,32 @@
     );
   }
 
+  function sortTerms(list) {
+    return list.slice().sort((a, b) => {
+      const ka = isKnown(a.id) ? 1 : 0;
+      const kb = isKnown(b.id) ? 1 : 0;
+      if (ka !== kb) return ka - kb; // 未習得が上
+      const sa = searchHits(a.id);
+      const sb = searchHits(b.id);
+      if (sa !== sb) return sb - sa; // よく開いた語が上
+      return a.nameJa.localeCompare(b.nameJa, "ja");
+    });
+  }
+
   function termsForParent(parentId) {
-    return state.terms
-      .filter((t) => t.id === parentId || t.parentId === parentId)
-      .sort((a, b) => a.nameJa.localeCompare(b.nameJa, "ja"));
+    return sortTerms(
+      state.terms.filter((t) => t.id === parentId || t.parentId === parentId)
+    );
   }
 
   function searchTerms(qRaw) {
     const q = normalize(qRaw);
     if (!q) return [];
-    return state.terms
-      .filter((t) => haystack(t).includes(q))
-      .sort((a, b) => a.nameJa.localeCompare(b.nameJa, "ja"));
+    return sortTerms(state.terms.filter((t) => haystack(t).includes(q)));
   }
 
   function allTermsSorted() {
-    return state.terms
-      .slice()
-      .sort((a, b) => a.nameJa.localeCompare(b.nameJa, "ja"));
+    return sortTerms(state.terms);
   }
 
   function setScreens(screen) {
@@ -113,6 +164,7 @@
   function showDetail(id) {
     const term = state.byId.get(id);
     if (!term) return;
+    bumpSearch(id);
     setScreens("detail");
     els.detail.innerHTML = renderDetail(term);
     history.replaceState(null, "", "#" + encodeURIComponent(id));
@@ -135,6 +187,7 @@
       .map((id) => state.byId.get(id))
       .filter(Boolean);
     const children = state.terms.filter((t) => t.parentId === term.id);
+    const known = isKnown(term.id);
 
     const relatedHtml = related.length
       ? `<div class="chips">${related
@@ -166,7 +219,12 @@
       : "";
 
     return `
-      <h2>${escapeHtml(term.nameJa)}</h2>
+      <div class="detail-top">
+        <h2>${escapeHtml(term.nameJa)}</h2>
+        <button type="button" class="know-btn${known ? " is-on" : ""}" data-know="${term.id}" aria-pressed="${known ? "true" : "false"}" title="わかった印">
+          ${known ? "★ わかった" : "☆ わかった"}
+        </button>
+      </div>
       <p class="reading">${escapeHtml(term.name)} ／ ${escapeHtml(term.reading || "")}</p>
       <p class="one">${escapeHtml(term.oneLiner)}</p>
       <dl class="meta">
@@ -194,14 +252,18 @@
       return `<li class="empty">該当なし。別名やカタカナでも試せます。</li>`;
     }
     return list
-      .map(
-        (t) => `<li>
-        <button type="button" data-open="${t.id}">
+      .map((t) => {
+        const known = isKnown(t.id);
+        return `<li class="term-row${known ? " is-known" : ""}">
+        <button type="button" class="term-open" data-open="${t.id}">
           <span class="name">${escapeHtml(t.nameJa)}</span>
           <span class="sub">${escapeHtml(t.name)} — ${escapeHtml(t.oneLiner)}</span>
         </button>
-      </li>`
-      )
+        <button type="button" class="know-btn${known ? " is-on" : ""}" data-know="${t.id}" aria-pressed="${known ? "true" : "false"}" title="わかった印" aria-label="${escapeHtml(t.nameJa)}をわかったにする">
+          ${known ? "★" : "☆"}
+        </button>
+      </li>`;
+      })
       .join("");
   }
 
@@ -227,9 +289,10 @@
     }
 
     const list = searching ? searchTerms(state.query) : allTermsSorted();
+    const unknown = list.filter((t) => !isKnown(t.id)).length;
     els.listTitle.textContent = searching
-      ? "検索結果（" + list.length + "）"
-      : "すべて";
+      ? "検索結果（" + list.length + "）・未習得 " + unknown
+      : "すべて（未習得が上・★は下）";
     els.list.innerHTML = termButtonsHtml(list);
     renderParents();
   }
@@ -246,8 +309,21 @@
         <span>${escapeHtml(p.note)}</span>
       </div>`;
     const list = termsForParent(p.id);
-    els.parentListTitle.textContent = "この分類の用語（" + list.length + "）";
+    els.parentListTitle.textContent =
+      "この分類の用語（" + list.length + "・未習得が上）";
     els.parentList.innerHTML = termButtonsHtml(list);
+  }
+
+  function refreshCurrent() {
+    if (state.screen === "detail") {
+      const id = decodeURIComponent((location.hash || "#").slice(1));
+      if (id && state.byId.has(id)) {
+        els.detail.innerHTML = renderDetail(state.byId.get(id));
+      }
+      return;
+    }
+    if (state.screen === "parent" && state.filterParent) renderParent();
+    else renderHome();
   }
 
   function applyHash() {
@@ -260,7 +336,6 @@
       }
     }
     if (raw && state.byId.has(raw)) {
-      // 用語詳細。親フィルタは維持しない（直リンク）
       state.filterParent = null;
       showDetail(raw);
       return;
@@ -288,6 +363,14 @@
     });
 
     document.body.addEventListener("click", (ev) => {
+      const know = ev.target.closest("[data-know]");
+      if (know) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        toggleKnown(know.getAttribute("data-know"));
+        refreshCurrent();
+        return;
+      }
       const open = ev.target.closest("[data-open]");
       if (!open) return;
       showDetail(open.getAttribute("data-open"));
@@ -315,7 +398,9 @@
   }
 
   async function boot() {
-    const res = await fetch("terms.json?v=0.2");
+    state.known = loadStore(STORAGE_KNOWN, {});
+    state.searchCount = loadStore(STORAGE_SEARCH, {});
+    const res = await fetch("terms.json?v=0.3");
     const data = await res.json();
     state.terms = data.terms || [];
     state.byId = new Map(state.terms.map((t) => [t.id, t]));

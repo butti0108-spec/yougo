@@ -1,4 +1,4 @@
-const CACHE = "yougo-v0.2";
+const CACHE = "yougo-v0.3";
 const ASSETS = [
   "./",
   "./index.html",
