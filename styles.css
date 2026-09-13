@@ -85,6 +85,11 @@ main {
   flex-direction: column;
 }
 
+.view[hidden],
+.home-stack[hidden] {
+  display: none !important;
+}
+
 .home-stack .hint { order: 0; }
 .home-stack .parent-grid { order: 1; }
 .home-stack .list-block { order: 2; }
